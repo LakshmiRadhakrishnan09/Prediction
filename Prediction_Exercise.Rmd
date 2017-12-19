@@ -1,0 +1,95 @@
+---
+title: "Prediction of Exercise"
+author: "Lakshmi R"
+date: "December 18, 2017"
+output:
+  html_document:
+    df_print: paged
+---
+
+## Synopsis
+Using devices such as Jawbone Up, Nike FuelBand, and Fitbit it is now possible to collect a large amount of data about personal activity relatively inexpensively. These type of devices are part of the quantified self movement - a group of enthusiasts who take measurements about themselves regularly to improve their health, to find patterns in their behavior, or because they are tech geeks. One thing that people regularly do is quantify how much of a particular activity they do, but they rarely quantify how well they do it. 
+
+The goal of this project is to use data from accelerometers on the belt, forearm, arm, and dumbell of 6 participants and predict the manner in which they did the exercise. 
+
+## Data
+
+The data for this project come from this source: http://web.archive.org/web/20161224072740/http:/groupware.les.inf.puc-rio.br/har.
+Load the data and create training, testing and validation data set.
+
+Load data
+```{r}
+
+library(caret)
+training_full <- read.csv("https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv")
+testing <- read.csv("https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv")
+
+set.seed(32323)
+
+split <- createDataPartition(y=training_full$classe,p=0.7,list=FALSE)
+validation <- training_full[-split,]
+training <- training_full[split,]
+
+```
+
+
+
+## Data Transformations
+
+Data is cleaned to remove NA values and variables with low variance. The first 6 columns are removed as it contains data collection details which are not relevant.
+```{r}
+isna <- sapply(training, function (x) any(is.na(x) | x == ""))
+goodtrain <- training[, !isna]
+nsv <- nearZeroVar(goodtrain, saveMetrics=TRUE)
+newTraining <- goodtrain[,!nsv$nzv]
+
+newTraining <- newTraining[, -(1:6)]
+```
+
+## Model Fitting
+
+Since there are many variables, we will use PCS to extract essential variables.
+
+```{r}
+tc <- trainControl(method = "cv", number = 3, verboseIter=TRUE , preProcOptions="pca", allowParallel=TRUE)
+
+```
+
+Trying to fit Decision Tree model
+
+```{r}
+model1 <- train(classe~.,data=newTraining, method="rpart", trControl=tc, na.action=na.omit)
+
+model1
+```
+
+Model has accuracy of .5 which seems to be very low. Trying random forest model,
+```{r}
+model2 <- train(classe~.,data=newTraining, method="rf", trControl=tc, na.action=na.omit)
+
+model2
+```
+
+Model has accuracy of .99, so selecting this model
+
+## Predictiing on validation data
+```{r}
+predictions <- predict(model2,newdata=validation)
+confusionMatrix(predictions,validation$classe)
+```
+
+Out of sample error is .0071.
+
+## Predicting on testing data
+
+```{r}
+predictions <-  predict(model2,newdata=testing)
+predictions
+
+```
+
+
+## Result Summary
+
+Random forest has accuracy .99 and Out of sample error  .0071.So this model should be able to predict the excercise data correctly.
+
